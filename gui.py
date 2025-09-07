@@ -113,7 +113,7 @@ class MainWindow:
 
     # Вкладка «Создание»
     def setup_create_tab(self):
-        tb.Label(self.tab_create, text="Имя и фамилия (например: Иван Петров):").pack(pady=5)
+        tb.Label(self.tab_create, text="Имя и фамилия (например: Никита Гуевич):").pack(pady=5)
         self.entry_fullname = tb.Entry(self.tab_create)
         self.entry_fullname.pack(pady=5, fill="x", padx=10)
 

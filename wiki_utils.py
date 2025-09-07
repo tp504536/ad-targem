@@ -46,31 +46,45 @@ def wiki_login_routine(username, password, parent_window, logger=None):
     time.sleep(60)  # Ждем 60 секунд
 
     try:
-        # Попробуем использовать старый метод с секретным ключом (как в оригинальном bash-скрипте)
-        WIKI_API_ENDPOINT_WITH_SECRET = "https://wiki.targem.ru/api.php?secret=nh1AHxMWRv5H"
-
+        # 1. Вход пользователя (старый метод - как в bash скрипте)
         if logger:
-            logger("Попытка входа с использованием секретного ключа...")
+            logger("Вход пользователя в wiki...")
 
-        # 1. Первый вход пользователя (старый метод)
-        if logger:
-            logger("Первый вход пользователя в wiki")
+        user_session = requests.Session()
 
-        # Получаем токен для пользователя (старый метод)
-        token_url = f"{WIKI_API_ENDPOINT_WITH_SECRET}&format=json&lgdomain=TARGEM.LOCAL&action=login&lgname={username}&lgpassword={password}&lgtoken="
-        response = requests.post(token_url, timeout=30)
-        token_data = response.json()
+        # Первый запрос для получения токена (как в оригинальном bash скрипте)
+        token_params = {
+            'action': 'login',
+            'lgname': username,
+            'lgpassword': password,
+            'lgdomain': 'TARGEM.LOCAL',
+            'format': 'json'
+        }
+
+        token_response = user_session.post(WIKI_API_ENDPOINT, data=token_params, timeout=30)
+        token_data = token_response.json()
         user_token = token_data.get('login', {}).get('token', '')
 
         if not user_token:
             if logger:
-                logger("Ошибка: Не удалось получить токен для пользователя (старый метод)")
+                logger("Ошибка: Не удалось получить токен для пользователя")
                 logger(f"Ответ сервера: {token_data}")
             return False
 
-        # Входим пользователем (старый метод)
-        login_url = f"{WIKI_API_ENDPOINT_WITH_SECRET}&format=json&lgdomain=TARGEM.LOCAL&action=login&lgname={username}&lgpassword={password}&lgtoken={user_token}"
-        login_response = requests.post(login_url, timeout=30)
+        if logger:
+            logger(f"Получен токен пользователя: {user_token}")
+
+        # Входим пользователем с токеном
+        login_params = {
+            'action': 'login',
+            'lgname': username,
+            'lgpassword': password,
+            'lgtoken': user_token,
+            'lgdomain': 'TARGEM.LOCAL',
+            'format': 'json'
+        }
+
+        login_response = user_session.post(WIKI_API_ENDPOINT, data=login_params, timeout=30)
         login_data = login_response.json()
         login_result = login_data.get('login', {}).get('result', '')
 
@@ -85,25 +99,45 @@ def wiki_login_routine(username, password, parent_window, logger=None):
 
         time.sleep(10)
 
-        # 2. Вход администратором для управления группами (старый метод)
+        # 2. Вход администратором (старый метод)
         if logger:
-            logger("Вход администратором для управления группами")
+            logger("Вход администратором для управления группами...")
 
-        # Получаем токен для администратора (старый метод)
-        admin_token_url = f"{WIKI_API_ENDPOINT_WITH_SECRET}&format=json&lgdomain=TARGEM.LOCAL&action=login&lgname={admin_login}&lgpassword={admin_password}&lgtoken="
-        admin_response = requests.post(admin_token_url, timeout=30)
-        admin_token_data = admin_response.json()
+        admin_session = requests.Session()
+
+        # Получаем токен для администратора
+        admin_token_params = {
+            'action': 'login',
+            'lgname': admin_login,
+            'lgpassword': admin_password,
+            'lgdomain': 'TARGEM.LOCAL',
+            'format': 'json'
+        }
+
+        admin_token_response = admin_session.post(WIKI_API_ENDPOINT, data=admin_token_params, timeout=30)
+        admin_token_data = admin_token_response.json()
         admin_token = admin_token_data.get('login', {}).get('token', '')
 
         if not admin_token:
             if logger:
-                logger("Ошибка: Не удалось получить токен для администратора (старый метод)")
+                logger("Ошибка: Не удалось получить токен для администратора")
                 logger(f"Ответ сервера: {admin_token_data}")
             return False
 
-        # Входим администратором (старый метод)
-        admin_login_url = f"{WIKI_API_ENDPOINT_WITH_SECRET}&format=json&lgdomain=TARGEM.LOCAL&action=login&lgname={admin_login}&lgpassword={admin_password}&lgtoken={admin_token}"
-        admin_login_response = requests.post(admin_login_url, timeout=30)
+        if logger:
+            logger(f"Получен токен администратора: {admin_token}")
+
+        # Входим администратором с токеном
+        admin_login_params = {
+            'action': 'login',
+            'lgname': admin_login,
+            'lgpassword': admin_password,
+            'lgtoken': admin_token,
+            'lgdomain': 'TARGEM.LOCAL',
+            'format': 'json'
+        }
+
+        admin_login_response = admin_session.post(WIKI_API_ENDPOINT, data=admin_login_params, timeout=30)
         admin_login_data = admin_login_response.json()
         admin_login_result = admin_login_data.get('login', {}).get('result', '')
 
@@ -113,59 +147,96 @@ def wiki_login_routine(username, password, parent_window, logger=None):
                 logger(f"Детали ошибки: {admin_login_data}")
             return False
 
-        # Сохраняем куки из ответа
-        admin_cookies = admin_login_response.cookies
-
         if logger:
             logger("Администратор успешно вошел в wiki")
 
-        # 3. Получаем токен для управления правами пользователя (старый метод)
+        # 3. Получаем токен для управления правами (старый метод)
         if logger:
             logger("Получение токена для управления правами...")
 
-        userrights_token_url = f"{WIKI_API_ENDPOINT_WITH_SECRET}&action=query&list=users&ususers={username}&format=json&ustoken=userrights"
-        userrights_response = requests.post(userrights_token_url, cookies=admin_cookies, timeout=30)
+        # Используем старый метод получения токена прав (как в bash скрипте)
+        userrights_token_params = {
+            'action': 'query',
+            'list': 'users',
+            'ususers': username,
+            'ustoken': 'userrights',
+            'format': 'json'
+        }
+
+        userrights_response = admin_session.get(WIKI_API_ENDPOINT, params=userrights_token_params, timeout=30)
         userrights_data = userrights_response.json()
 
-        # Извлекаем токен из ответа (может быть в разных форматах)
+        # Извлекаем токен из ответа (старый формат)
         userrights_token = None
         if 'query' in userrights_data and 'users' in userrights_data['query']:
             users = userrights_data['query']['users']
-            if users and 'userrightstoken' in users[0]:
-                userrights_token = users[0]['userrightstoken']
+            if users and len(users) > 0:
+                userrights_token = users[0].get('userrightstoken', '')
 
         if not userrights_token:
             if logger:
                 logger("Ошибка: Не удалось получить токен управления правами")
                 logger(f"Ответ сервера: {userrights_data}")
-            return False
+
+            # Попробуем альтернативный метод - получить токен через action=query&meta=tokens
+            try:
+                token_params_alt = {
+                    'action': 'query',
+                    'meta': 'tokens',
+                    'type': 'userrights',
+                    'format': 'json'
+                }
+
+                token_response_alt = admin_session.get(WIKI_API_ENDPOINT, params=token_params_alt, timeout=30)
+                token_data_alt = token_response_alt.json()
+                userrights_token = token_data_alt.get('query', {}).get('tokens', {}).get('userrightstoken', '')
+
+                if not userrights_token:
+                    if logger:
+                        logger("Альтернативный метод также не сработал")
+                    return False
+            except:
+                if logger:
+                    logger("Альтернативный метод получения токена не сработал")
+                return False
+
+        if logger:
+            logger(f"Получен токен управления правами: {userrights_token}")
 
         # 4. Добавляем пользователя в группу targem (старый метод)
         if logger:
             logger("Добавление пользователя в группу targem...")
 
-        add_group_url = f"{WIKI_API_ENDPOINT_WITH_SECRET}&action=userrights&user={username}&format=json&add=targem&token={userrights_token}"
-        add_group_response = requests.post(add_group_url, cookies=admin_cookies, timeout=30)
+        add_group_params = {
+            'action': 'userrights',
+            'user': username,
+            'add': 'targem',
+            'token': userrights_token,
+            'format': 'json'
+        }
+
+        add_group_response = admin_session.post(WIKI_API_ENDPOINT, data=add_group_params, timeout=30)
+        add_group_data = add_group_response.json()
 
         if add_group_response.status_code == 200:
-            try:
-                add_group_data = add_group_response.json()
-                if logger:
-                    logger(f"Ответ сервера на добавление в группу: {add_group_data}")
+            # Проверяем различные возможные форматы успешного ответа
+            success = False
+            if 'userrights' in add_group_data:
+                success = True
+            elif 'error' in add_group_data and 'already in' in add_group_data['error'].get('info', '').lower():
+                success = True
+            elif 'success' in str(add_group_data).lower():
+                success = True
 
-                if 'userrights' in add_group_data and 'added' in add_group_data['userrights']:
-                    if logger:
-                        logger(f"Пользователь {username} успешно добавлен в группу targem в wiki")
-                    return True
-                else:
-                    if logger:
-                        logger("Пользователь добавлен, но ответ сервера не содержит ожидаемых данных")
-                    return True
-            except:
-                # Если не удалось распарсить JSON, но статус 200 - вероятно успех
+            if success:
                 if logger:
-                    logger(f"Пользователь {username} добавлен в группу targem (статус 200)")
+                    logger(f"Пользователь {username} успешно добавлен в группу targem в wiki")
+                    logger(f"Ответ сервера: {add_group_data}")
                 return True
+            else:
+                if logger:
+                    logger(f"Неожиданный ответ сервера: {add_group_data}")
+                return False
         else:
             if logger:
                 logger(f"Ошибка добавления в группу: {add_group_response.status_code}")
@@ -184,3 +255,5 @@ def wiki_login_routine(username, password, parent_window, logger=None):
         if logger:
             logger(f"Ошибка при работе с wiki API: {str(e)}")
         return False
+
+#work
