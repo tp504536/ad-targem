@@ -1,24 +1,29 @@
 import random
 import string
 import iuliia
+import paramiko
 from ldap3 import MODIFY_ADD
 import email_utils
 import zimbra_utils
-import paramiko
+import wiki_utils  # Добавляем импорт
+
 
 def generate_password(length=12):
     chars = string.ascii_letters + string.digits
     return ''.join(random.choices(chars, k=length))
 
 
-def create_user(conn, base_dn, full_name, selected_groups_dn, selected_ou_dn, wiki, office_login, owncloud, logger):
+def create_user(conn, base_dn, full_name, selected_groups_dn, selected_ou_dn, wiki, office_login, owncloud,
+                parent_window, logger=None):
     if not full_name.strip():
-        logger("Ошибка: Введите имя и фамилию")
+        if logger:
+            logger("Ошибка: Введите имя и фамилию")
         return False
 
     parts = full_name.strip().split()
     if len(parts) < 2:
-        logger("Ошибка: Введите имя и фамилию")
+        if logger:
+            logger("Ошибка: Введите имя и фамилию")
         return False
 
     first_name = parts[0].capitalize()
@@ -27,7 +32,8 @@ def create_user(conn, base_dn, full_name, selected_groups_dn, selected_ou_dn, wi
     password = generate_password()
     display_name = f"{first_name} {last_name}"
 
-    logger(f"Создание пользователя {display_name} (логин: {username}, пароль: {password})...")
+    if logger:
+        logger(f"Создание пользователя {display_name} (логин: {username}, пароль: {password})...")
 
     try:
         user_dn = f"CN={display_name},{selected_ou_dn}" if selected_ou_dn else f"CN={display_name},CN=Users,{base_dn}"
@@ -45,7 +51,8 @@ def create_user(conn, base_dn, full_name, selected_groups_dn, selected_ou_dn, wi
             }
         )
         if conn.result['description'] != 'success':
-            logger(f"Ошибка создания: {conn.result}")
+            if logger:
+                logger(f"Ошибка создания: {conn.result}")
             return False
 
         # пароль + включение учётки
@@ -56,7 +63,8 @@ def create_user(conn, base_dn, full_name, selected_groups_dn, selected_ou_dn, wi
         added_groups = []
         for group_cn, group_dn in selected_groups_dn:
             conn.modify(group_dn, {'member': [(MODIFY_ADD, [user_dn])]})
-            logger(f"{username} добавлен в группу {group_cn}")
+            if logger:
+                logger(f"{username} добавлен в группу {group_cn}")
             added_groups.append(group_cn)
 
         # Создание почты
@@ -64,15 +72,23 @@ def create_user(conn, base_dn, full_name, selected_groups_dn, selected_ou_dn, wi
             username, password, first_name, last_name, display_name,
             outsource="outsource" if "owncloud_outsrc" in added_groups else "internal"
         )
-        if email:
+        if email and logger:
             logger(f"Почта создана: {email}")
 
-        # Доп. сервисы по чекбоксам (заглушки под ваши API)
+        # Доп. сервисы по чекбоксам
         if wiki:
-            logger("Создаём учётную запись в Wiki (TODO: интеграция API)...")
-        if office_login:
+            if logger:
+                logger("Добавление пользователя в Wiki...")
+            wiki_success = wiki_utils.wiki_login_routine(username, password, parent_window, logger)
+            if wiki_success and logger:
+                logger("Пользователь успешно добавлен в Wiki и группу targem")
+            elif logger:
+                logger("Ошибка при работе с Wiki")
+
+        if office_login and logger:
             logger("Логиним пользователя в office.targem.ru (TODO: интеграция API)...")
-        if owncloud:
+
+        if owncloud and logger:
             if "owncloud_outsrc" in added_groups:
                 logger("Добавляем пользователя в OwnCloud (TODO: интеграция API)...")
             else:
@@ -83,9 +99,9 @@ def create_user(conn, base_dn, full_name, selected_groups_dn, selected_ou_dn, wi
         return True
 
     except Exception as e:
-        logger(f"Ошибка: {str(e)}")
+        if logger:
+            logger(f"Ошибка: {str(e)}")
         return False
-
 
 def delete_user(conn, base_dn, username, delete_mail=False, block_mail=False, logger=None):
     if not username.strip():
