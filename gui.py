@@ -136,8 +136,7 @@ class MainWindow:
         self.chk_office = tk.IntVar()
         self.chk_owncloud = tk.IntVar()
 
-        tk.Checkbutton(opts_frame, text="Создать в Wiki", variable=self.chk_wiki).grid(row=0, column=0, sticky="w",
-                                                                                       padx=10)
+        tk.Checkbutton(opts_frame, text="Добавить в Wiki (запросит учетные данные админа)", variable=self.chk_wiki).grid(row=0, column=0, sticky="w", padx=10)
         tk.Checkbutton(opts_frame, text="Залогинить в office.targem.ru", variable=self.chk_office).grid(row=0, column=1,
                                                                                                         sticky="w",
                                                                                                         padx=10)
